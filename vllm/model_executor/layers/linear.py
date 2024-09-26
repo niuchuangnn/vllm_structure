@@ -17,6 +17,7 @@ from vllm.model_executor.parameter import (BasevLLMParameter,
                                            PackedvLLMParameter,
                                            PerTensorScaleParameter)
 from vllm.model_executor.utils import set_weight_attrs
+import os
 
 logger = init_logger(__name__)
 
@@ -283,7 +284,8 @@ class ColumnParallelLinear(LinearBase):
         self.gather_output = gather_output
 
         # Divide the weight matrix along the last dimension.
-        tp_size = get_tensor_model_parallel_world_size()
+        # tp_size = get_tensor_model_parallel_world_size()
+        tp_size = 8
         assert self.quant_method is not None
         self.output_size_per_partition = divide(self.output_size, tp_size)
         self.output_partition_sizes = [self.output_size_per_partition]
@@ -407,7 +409,8 @@ class MergedColumnParallelLinear(ColumnParallelLinear):
                  quant_config: Optional[QuantizationConfig] = None,
                  prefix: str = ""):
         self.output_sizes = output_sizes
-        tp_size = get_tensor_model_parallel_world_size()
+        # tp_size = get_tensor_model_parallel_world_size()
+        tp_size = 8
         assert all(output_size % tp_size == 0 for output_size in output_sizes)
         super().__init__(input_size=input_size,
                          output_size=sum(output_sizes),
@@ -590,7 +593,8 @@ class MergedColumnParallelLinear(ColumnParallelLinear):
 
         assert loaded_shard_id < len(self.output_sizes)
 
-        tp_size = get_tensor_model_parallel_world_size()
+        # tp_size = get_tensor_model_parallel_world_size()
+        tp_size = 8
         shard_offset = sum(self.output_sizes[:loaded_shard_id]) // tp_size
         shard_size = self.output_sizes[loaded_shard_id] // tp_size
 
@@ -643,7 +647,8 @@ class QKVParallelLinear(ColumnParallelLinear):
             total_num_kv_heads = total_num_heads
         self.total_num_kv_heads = total_num_kv_heads
         # Divide the weight matrix along the last dimension.
-        tp_size = get_tensor_model_parallel_world_size()
+        # tp_size = get_tensor_model_parallel_world_size()
+        tp_size = 8
         self.num_heads = divide(self.total_num_heads, tp_size)
         if tp_size >= self.total_num_kv_heads:
             self.num_kv_heads = 1
@@ -944,8 +949,13 @@ class RowParallelLinear(LinearBase):
         self.reduce_results = reduce_results
 
         # Divide the weight matrix along the last dimension.
-        self.tp_rank = get_tensor_model_parallel_rank()
-        self.tp_size = get_tensor_model_parallel_world_size()
+        # self.tp_rank = get_tensor_model_parallel_rank()
+        if "LOCAL_RANK" in os.environ:
+            self.tp_rank = int(os.environ["LOCAL_RANK"])
+        else:
+            self.tp_rank = get_tensor_model_parallel_rank()
+        # self.tp_size = get_tensor_model_parallel_world_size()
+        self.tp_size = 8
         self.input_size_per_partition = divide(input_size, self.tp_size)
         assert self.quant_method is not None
 

@@ -1,0 +1,29 @@
+CT LUNG SCREEN WO CONTRAST, 1/4/2021 8:09 AM
+
+INDICATION:Lung cancer annual screening, asymptomatic, current smoker (min. 30 pack-yrs) \ Z87.891 Personal history of tobacco use, presenting hazards to health 
+COMPARISON: None
+
+TECHNIQUE: 1.25 mm low dose axial CT images obtained through the chest with multi-planar reformats. Typical radiation exposure is 1.2-1.4 mSv.
+
+FINDINGS:
+
+LUNG NODULES: 4 mm nodules in the right middle lobe adjacent to the minor fissure. Additional 3 and 4 mm subpleural nodules in the right upper lobe best seen on images 164 and 165 series 2 respectively. Right sided major fissural lymph node. 5 mm left lower lobe nodule best seen on image 206 series 2. Additional scattered peripheral bilateral 2 to 3 mm sized pulmonary nodules. Some of the nodules are calcified.
+
+COPD: Emphysema and bronchial wall thickening.
+Severity: Moderate.
+
+PLEURA: No pleural thickening or effusion. 
+
+HEART: Heart size normal. No pericardial effusion.
+
+CORONARY ARTERY CALCIFICATION: None.
+
+MEDIASTINUM/HILUM/AXILLA: No adenopathy.
+
+OTHER FINDINGS: Cholecystectomy.
+
+CONCLUSION:  
+OVERALL LUNG-RADS CATEGORY: 2S, 
+BASED ON LESION: ID multiple bilateral pulmonary nodules some of which are calcified consistent with old granulomatous disease. 
+MANAGEMENT RECOMMENDATION: Annual surveillance
+FOLLOW-UP DATE: January 2022

@@ -37,7 +37,7 @@ def flash_attn_varlen_func(
     alibi_slopes: Optional[torch.Tensor] = None,
     block_table: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    # custom op does not support tuple input
+    # structure op does not support tuple input
     real_window_size: Tuple[int, int]
     if window_size is None:
         real_window_size = (-1, -1)

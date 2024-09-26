@@ -50,7 +50,7 @@ from vllm.prompt_adapter.worker_manager import (
     LRUCacheWorkerPromptAdapterManager)
 from vllm.sampling_params import SamplingParams
 from vllm.sequence import (IntermediateTensors, SamplerOutput,
-                           SequenceGroupMetadata)
+                           SequenceGroupMetadata, SequenceData)
 from vllm.utils import (CudaMemoryProfiler, PyObjectCache, async_tensor_h2d,
                         flatten_2d_lists, get_kv_cache_torch_dtype, is_hip,
                         is_pin_memory_available)
@@ -100,6 +100,15 @@ class ModelInputForGPU(ModelRunnerInputBase):
     request_ids_to_seq_ids: Optional[Dict[str, List[int]]] = None
     finished_requests_ids: Optional[List[str]] = None
     virtual_engine: int = 0
+    # add
+    template_tokens: Optional[torch.Tensor] = None
+    candidate_tokens_dict: Optional[Dict[str, List[int]]] = None
+    candidate_idx_temp: Optional[List[List[int]]] = None
+    loc_template: Optional[int] = None
+    loc_in_current_candidate: Optional[int] = None
+    num_template_predicted: Optional[int] = None
+    update_template: Optional[bool] = None
+    template: Optional[dict] = None
 
     def as_broadcastable_tensor_dict(self) -> Dict[str, Any]:
         tensor_dict = {
@@ -113,6 +122,14 @@ class ModelInputForGPU(ModelRunnerInputBase):
             "virtual_engine": self.virtual_engine,
             "request_ids_to_seq_ids": self.request_ids_to_seq_ids,
             "finished_requests_ids": self.finished_requests_ids,
+            "template_tokens": self.template_tokens,
+            "candidate_tokens_dict": self.candidate_tokens_dict,
+            "candidate_idx_temp": self.candidate_idx_temp,
+            "loc_template": self.loc_template,
+            "loc_in_current_candidate": self.loc_in_current_candidate,
+            "num_template_predicted": self.num_template_predicted,
+            "update_template": self.update_template,
+            "template": self.template,
         }
         _add_attn_metadata_broadcastable_dict(tensor_dict, self.attn_metadata)
         return tensor_dict
@@ -151,6 +168,14 @@ class ModelInputForGPUWithSamplingMetadata(ModelInputForGPU):
             "virtual_engine": self.virtual_engine,
             "request_ids_to_seq_ids": self.request_ids_to_seq_ids,
             "finished_requests_ids": self.finished_requests_ids,
+            "template_tokens": self.template_tokens,
+            "candidate_tokens_dict": self.candidate_tokens_dict,
+            "candidate_idx_temp": self.candidate_idx_temp,
+            "loc_template": self.loc_template,
+            "loc_in_current_candidate": self.loc_in_current_candidate,
+            "num_template_predicted": self.num_template_predicted,
+            "update_template": self.update_template,
+            "template": self.template,
         }
         _add_attn_metadata_broadcastable_dict(tensor_dict, self.attn_metadata)
         _add_sampling_metadata_broadcastable_dict(tensor_dict,
@@ -192,6 +217,15 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             self.lora_requests.clear()  # type: ignore
             self.prompt_adapter_index_mapping.clear()  # type: ignore
             self.prompt_adapter_prompt_mapping.clear()  # type: ignore
+            # Add
+            self.template_tokens.clear()
+            self.candidate_tokens_dict.clear()
+            self.candidate_idx_temp.clear()
+            self.template.clear()
+            self.loc_template[0] = 0
+            self.loc_in_current_candidate[0] = 0
+            self.num_template_predicted[0] = 0
+            self.update_template[0] = False
 
         def __init__(
             self,
@@ -207,6 +241,16 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             # Input tokens and positions.
             input_tokens: Optional[List[List[int]]] = None,
             input_positions: Optional[List[List[int]]] = None,
+
+            # Add
+            template_tokens: Optional[List[List[int]]] = None,
+            candidate_tokens_dict: Optional[Dict[int, List[int]]] = None,
+            candidate_idx_temp: Optional[List[List[int]]] = None,
+            loc_template: Optional[List[int]] = None,
+            loc_in_current_candidate: Optional[List[int]] = None,
+            num_template_predicted: Optional[List[int]] = None,
+            update_template: Optional[List[bool]] = None,
+            template: Optional[dict] = None,
 
             # The sequence length (may be capped to the sliding window).
             seq_lens: Optional[List[int]] = None,
@@ -266,6 +310,54 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
                     else:
                         for seq_id in range(len(self.seq_ids)):
                             self.input_positions[seq_id].clear()
+
+                    if template_tokens:
+                        self.template_tokens = template_tokens
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.template_tokens[seq_id].clear()
+
+                    if candidate_tokens_dict:
+                        self.candidate_tokens_dict = candidate_tokens_dict
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.candidate_tokens_dict[seq_id].clear()
+
+                    if candidate_idx_temp:
+                        self.candidate_idx_temp = candidate_idx_temp
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.candidate_idx_temp[seq_id].clear()
+
+                    if template:
+                        self.template = template
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.template[seq_id].clear()
+
+                    if loc_template:
+                        self.loc_template = loc_template
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.loc_template[seq_id] = 0
+
+                    if loc_in_current_candidate:
+                        self.loc_in_current_candidate = loc_in_current_candidate
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.loc_in_current_candidate[seq_id] = 0
+
+                    if num_template_predicted:
+                        self.num_template_predicted = num_template_predicted
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.num_template_predicted[seq_id] = 0
+
+                    if update_template:
+                        self.update_template = update_template
+                    else:
+                        for seq_id in range(len(self.seq_ids)):
+                            self.update_template[seq_id] = False
 
                     if seq_lens:
                         self.seq_lens = seq_lens
@@ -328,6 +420,14 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             else:
                 self.input_tokens = input_tokens or []
                 self.input_positions = input_positions or []
+                self.template_tokens = template_tokens or []
+                self.candidate_tokens_dict = candidate_tokens_dict or []
+                self.candidate_idx_temp = candidate_idx_temp or []
+                self.loc_template = loc_template or []
+                self.loc_in_current_candidate = loc_in_current_candidate or []
+                self.num_template_predicted = num_template_predicted or []
+                self.update_template = update_template or []
+                self.template = template or []
                 self.seq_lens = seq_lens or []
                 self.orig_seq_lens = orig_seq_lens or []
                 self.query_lens = query_lens or []
@@ -358,6 +458,14 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
 
             self.input_tokens = [[] for _ in range(self.n_seqs)]
             self.input_positions = [[] for _ in range(self.n_seqs)]
+            self.template_tokens = [[] for _ in range(self.n_seqs)]
+            self.candidate_tokens_dict = [{} for _ in range(self.n_seqs)]
+            self.candidate_idx_temp = [[] for _ in range(self.n_seqs)]
+            self.template = [[] for _ in range(self.n_seqs)]
+            self.loc_template = [0] * self.n_seqs
+            self.loc_in_current_candidate = [0] * self.n_seqs
+            self.num_template_predicted = [0] * self.n_seqs
+            self.update_template = [False] * self.n_seqs
             self.seq_lens = [0] * self.n_seqs
             self.orig_seq_lens = [0] * self.n_seqs
             self.query_lens = [0] * self.n_seqs
@@ -493,6 +601,17 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
 
         inter_data.query_lens[
             seq_idx] = seq_len - context_len if inter_data.is_prompt else 1
+
+        if seq_data.template_tokens is not None:
+            inter_data.template_tokens.append(seq_data.template_tokens)
+            inter_data.candidate_tokens_dict.append(seq_data.candidate_tokens_dict)
+            inter_data.candidate_idx_temp.append(seq_data.candidate_idx_temp)
+            inter_data.template.append(seq_data.template)
+            inter_data.loc_template[seq_idx] = seq_data.loc_template
+            inter_data.loc_in_current_candidate[seq_idx] = seq_data.loc_in_current_candidate
+            inter_data.num_template_predicted[seq_idx] = seq_data.num_candidates_predicted
+            inter_data.update_template[seq_idx] = seq_data.update_template
+
 
     def _compute_for_prefix_cache_hit(
             self, inter_data: InterDataForSeqGroup, seq_idx: int,
@@ -709,6 +828,56 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
                                                   self.runner.device,
                                                   self.runner.pin_memory)
 
+        # Add
+        template_tokens = []
+        for inter_data in self.inter_data_list:
+            # for cur_template_tokens in inter_data.template_tokens:
+            template_tokens.extend(inter_data.template_tokens)
+        if not template_tokens:
+            template_tokens = None
+
+        candidate_tokens_dict = []
+        for inter_data in self.inter_data_list:
+            candidate_tokens_dict.extend(inter_data.candidate_tokens_dict)
+        if not candidate_tokens_dict:
+            candidate_tokens_dict = None
+
+        candidate_idx_temp = []
+        for inter_data in self.inter_data_list:
+            candidate_idx_temp.extend(inter_data.candidate_idx_temp)
+        if not candidate_idx_temp:
+            candidate_idx_temp = None
+
+        loc_template = []
+        for inter_data in self.inter_data_list:
+            loc_template.extend(inter_data.loc_template)
+        if not loc_template:
+            loc_template = None
+
+        loc_in_current_candidate = []
+        for inter_data in self.inter_data_list:
+            loc_in_current_candidate.extend(inter_data.loc_in_current_candidate)
+        if not loc_in_current_candidate:
+            loc_in_current_candidate = None
+
+        num_template_predicted = []
+        for inter_data in self.inter_data_list:
+            num_template_predicted.extend(inter_data.num_template_predicted)
+        if not num_template_predicted:
+            num_template_predicted = None
+
+        update_template = []
+        for inter_data in self.inter_data_list:
+            update_template.extend(inter_data.update_template)
+        if not update_template:
+            update_template = None
+
+        template = []
+        for inter_data in self.inter_data_list:
+            template.extend(inter_data.template)
+        if not template:
+            template = None
+
         # Sequence and query lengths.
         if cuda_graph_pad_size:
             seq_lens.extend(itertools.repeat(1, cuda_graph_pad_size))
@@ -782,7 +951,16 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             request_ids_to_seq_ids=request_ids_to_seq_ids,
             finished_requests_ids=self.finished_requests_ids,
             prompt_adapter_mapping=prompt_adapter_mapping,
-            prompt_adapter_requests=prompt_adapter_requests)
+            prompt_adapter_requests=prompt_adapter_requests,
+            template_tokens=template_tokens,
+            candidate_tokens_dict=candidate_tokens_dict,
+            candidate_idx_temp=candidate_idx_temp,
+            loc_template=loc_template,
+            loc_in_current_candidate=loc_in_current_candidate,
+            num_template_predicted=num_template_predicted,
+            update_template=update_template,
+            template=template,
+        )
 
 
 class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
@@ -1459,6 +1637,7 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
         kv_caches: List[torch.Tensor],
         intermediate_tensors: Optional[IntermediateTensors] = None,
         num_steps: int = 1,
+        # seq_data: Optional[SequenceData] = None,
     ) -> Optional[Union[List[SamplerOutput], IntermediateTensors]]:
         if num_steps > 1:
             raise ValueError("num_steps > 1 is not supported in ModelRunner")
@@ -1576,6 +1755,14 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
         output: SamplerOutput = self.model.sample(
             logits=logits,
             sampling_metadata=model_input.sampling_metadata,
+            template_tokens=model_input.template_tokens,
+            candidate_tokens_dict=model_input.candidate_tokens_dict,
+            candidate_idx_temp=model_input.candidate_idx_temp,
+            loc_template=model_input.loc_template,
+            loc_in_current_candidate=model_input.loc_in_current_candidate,
+            num_template_predicted=model_input.num_template_predicted,
+            update_template=model_input.update_template,
+            # template=model_input.template,
         )
         if (self.observability_config is not None
                 and self.observability_config.collect_model_forward_time

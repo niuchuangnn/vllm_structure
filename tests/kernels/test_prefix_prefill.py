@@ -441,7 +441,7 @@ def test_contexted_kv_attention_alibi(
     start_time = time.time()
     # Attention with alibi slopes.
     # FIXME(DefTruth): Because xformers does not support dynamic sequence
-    # lengths with custom attention bias, we process each prompt one by
+    # lengths with structure attention bias, we process each prompt one by
     # one. This is inefficient, especially when we have many short prompts.
     # modified from: vllm/attention/backends/xformers.py#L343
     for i, (query_len, seq_len) in enumerate(zip(query_lens, seq_lens)):

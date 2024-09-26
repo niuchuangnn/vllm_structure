@@ -742,7 +742,7 @@ class XFormersImpl(AttentionImpl[XFormersMetadata]):
 
         # Attention with alibi slopes.
         # FIXME(woosuk): Because xformers does not support dynamic sequence
-        # lengths with custom attention bias, we process each prompt one by
+        # lengths with structure attention bias, we process each prompt one by
         # one. This is inefficient, especially when we have many short prompts.
         assert attn_metadata.seq_lens is not None
         output = torch.empty_like(original_query)

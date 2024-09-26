@@ -12,6 +12,7 @@ from vllm.model_executor.model_loader.loader import build_model
 from vllm.model_executor.models import ModelRegistry
 from vllm.multimodal import BatchedTensors
 from vllm.utils import is_pin_memory_available
+import os
 
 
 def filter_weights(weights: Iterable[Tuple[str, torch.Tensor]], prefix: str):
@@ -188,9 +189,17 @@ def make_layers(
     """
     from vllm.distributed.parallel_state import get_pp_group
     from vllm.distributed.utils import get_pp_indices
-    start_layer, end_layer = get_pp_indices(num_hidden_layers,
-                                            get_pp_group().rank_in_group,
-                                            get_pp_group().world_size)
+    # start_layer, end_layer = get_pp_indices(num_hidden_layers,
+    #                                         get_pp_group().rank_in_group,
+    #                                         get_pp_group().world_size)
+    if "LOCAL_RANK" in os.environ:
+        start_layer, end_layer = get_pp_indices(num_hidden_layers,
+                                                0,
+                                                1)
+    else:
+        start_layer, end_layer = get_pp_indices(num_hidden_layers,
+                                                get_pp_group().rank_in_group,
+                                                get_pp_group().world_size)
     modules = torch.nn.ModuleList(
         [PPMissingLayer() for _ in range(start_layer)] + [
             maybe_offload_to_cpu(layer_fn(prefix=f"{prefix}.{idx}"))

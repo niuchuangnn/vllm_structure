@@ -1,4 +1,4 @@
-from typing import Optional, Type
+from typing import Optional, Type, List
 
 from vllm.config import (ModelConfig, ParallelConfig, SchedulerConfig,
                          TokenizerPoolConfig)
@@ -16,14 +16,16 @@ else:
 def init_tokenizer_from_configs(model_config: ModelConfig,
                                 scheduler_config: SchedulerConfig,
                                 parallel_config: ParallelConfig,
-                                enable_lora: bool):
+                                enable_lora: bool,
+                                additional_special_tokens: List[str] = None):
     init_kwargs = dict(tokenizer_id=model_config.tokenizer,
                        enable_lora=enable_lora,
                        max_num_seqs=scheduler_config.max_num_seqs,
                        max_input_length=None,
                        tokenizer_mode=model_config.tokenizer_mode,
                        trust_remote_code=model_config.trust_remote_code,
-                       revision=model_config.tokenizer_revision)
+                       revision=model_config.tokenizer_revision,
+                       additional_special_tokens=additional_special_tokens)
 
     return get_tokenizer_group(parallel_config.tokenizer_pool_config,
                                **init_kwargs)

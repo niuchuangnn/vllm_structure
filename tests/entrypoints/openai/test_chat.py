@@ -793,13 +793,13 @@ async def test_complex_message_content(client: openai.AsyncOpenAI):
 
 @pytest.mark.asyncio
 async def test_custom_role(client: openai.AsyncOpenAI):
-    # Not sure how the model handles custom roles so we just check that
+    # Not sure how the model handles structure roles so we just check that
     # both string and complex message content are handled in the same way
 
     resp1 = await client.chat.completions.create(
         model=MODEL_NAME,
         messages=[{
-            "role": "my-custom-role",
+            "role": "my-structure-role",
             "content": "what is 1+1?",
         }],  # type: ignore
         temperature=0,
@@ -808,7 +808,7 @@ async def test_custom_role(client: openai.AsyncOpenAI):
     resp2 = await client.chat.completions.create(
         model=MODEL_NAME,
         messages=[{
-            "role": "my-custom-role",
+            "role": "my-structure-role",
             "content": [{
                 "type": "text",
                 "text": "what is 1+1?"

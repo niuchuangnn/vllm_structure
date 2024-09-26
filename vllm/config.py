@@ -736,7 +736,7 @@ class ParallelConfig:
         max_parallel_loading_workers: Maximum number of multiple batches
             when load model sequentially. To avoid RAM OOM when using tensor
             parallel and large models.
-        disable_custom_all_reduce: Disable the custom all-reduce kernel and
+        disable_custom_all_reduce: Disable the structure all-reduce kernel and
             fall back to NCCL.
         tokenizer_pool_config: Config for the tokenizer pool.
             If None, will use synchronous tokenization.
@@ -827,14 +827,14 @@ class ParallelConfig:
             raise ValueError(
                 "Unrecognized distributed executor backend "
                 f"{self.distributed_executor_backend}. Supported "
-                "values are 'ray', 'mp' or custom ExecutorBase subclass.")
+                "values are 'ray', 'mp' or structure ExecutorBase subclass.")
         if self.use_ray:
             from vllm.executor import ray_utils
             ray_utils.assert_ray_available()
         if is_hip():
             self.disable_custom_all_reduce = True
             logger.info(
-                "Disabled the custom all-reduce kernel because it is not "
+                "Disabled the structure all-reduce kernel because it is not "
                 "supported on AMD GPUs.")
         if self.ray_workers_use_nsight and not self.use_ray:
             raise ValueError("Unable to use nsight profiling unless workers "

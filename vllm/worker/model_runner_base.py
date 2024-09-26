@@ -96,7 +96,7 @@ class ModelRunnerInputBase(ABC):
     def as_broadcastable_tensor_dict(self) -> Dict[str, Any]:
         """
         Extract broadcastable fields. Override for fields that require some
-        custom deserialization.
+        structure deserialization.
         """
         raise NotImplementedError
 

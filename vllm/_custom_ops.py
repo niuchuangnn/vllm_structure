@@ -28,7 +28,7 @@ def hint_on_error(fn):
             return fn(*args, **kwargs)
         except AttributeError as e:
             msg = (
-                "Error in calling custom op %s: %s\n"
+                "Error in calling structure op %s: %s\n"
                 "Possibly you have built or installed an obsolete version of vllm.\n"
                 "Please try a clean build and install of vllm,"
                 "or remove old built files such as vllm/*cpython*.so and build/ ."
@@ -527,7 +527,7 @@ def get_max_shared_memory_per_block_device_attribute(device: int) -> int:
         device)
 
 
-# custom ar
+# structure ar
 def init_custom_ar(meta: torch.Tensor, rank_data: torch.Tensor,
                    handles: List[str], offsets: List[int], rank: int,
                    full_nvlink: bool) -> int:

@@ -389,8 +389,23 @@ class Qwen2ForCausalLM(nn.Module, SupportsLoRA):
         self,
         logits: torch.Tensor,
         sampling_metadata: SamplingMetadata,
+        template_tokens: Optional[List[int]] = None,
+        candidate_tokens_dict: Optional[list[dict]] = None,
+        candidate_idx_temp: Optional[list[list[list[int]]]] = None,
+        loc_template: Optional[list[int]] = None,
+        loc_in_current_candidate: Optional[list[int]] = None,
+        num_template_predicted: Optional[list[int]] = None,
+        update_template: Optional[list[bool]] = None,
     ) -> Optional[SamplerOutput]:
-        next_tokens = self.sampler(logits, sampling_metadata)
+        next_tokens = self.sampler(logits, sampling_metadata,
+                                   template_tokens=template_tokens,
+                                   candidate_tokens_dict=candidate_tokens_dict,
+                                   candidate_idx_temp=candidate_idx_temp,
+                                   loc_template=loc_template,
+                                   loc_in_current_candidate=loc_in_current_candidate,
+                                   num_template_predicted=num_template_predicted,
+                                   update_template=update_template
+                                   )
         return next_tokens
 
     def load_weights(self, weights: Iterable[Tuple[str, torch.Tensor]]):

@@ -45,6 +45,12 @@ class StopChecker:
         if seq.get_output_len() < sampling_params.min_tokens:
             return
 
+        # Add
+        if seq.data.loc_template is not None:
+            if seq.data.loc_template + 1 >= len(seq.data.template_tokens):
+                seq.status = SequenceStatus.FINISHED_STOPPED
+                return
+
         # Check if the sequence has generated the EOS token.
         if ((not sampling_params.ignore_eos)
                 and seq.get_last_token_id() == seq.eos_token_id):

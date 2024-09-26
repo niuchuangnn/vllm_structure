@@ -91,7 +91,7 @@ def test_descendent_loggers_depend_on_and_propagate_logs_to_root_logger():
 @patch("vllm.logger.VLLM_CONFIGURE_LOGGING", 0)
 @patch("vllm.logger.VLLM_LOGGING_CONFIG_PATH", None)
 def test_logger_configuring_can_be_disabled():
-    """This test calls _configure_vllm_root_logger again to test custom logging
+    """This test calls _configure_vllm_root_logger again to test structure logging
     config behavior, however mocks are used to ensure no changes in behavior or
     configuration occur."""
 
@@ -106,7 +106,7 @@ def test_logger_configuring_can_be_disabled():
     "/if/there/is/a/file/here/then/you/did/this/to/yourself.json",
 )
 def test_an_error_is_raised_when_custom_logging_config_file_does_not_exist():
-    """This test calls _configure_vllm_root_logger again to test custom logging
+    """This test calls _configure_vllm_root_logger again to test structure logging
     config behavior, however it fails before any change in behavior or
     configuration occurs."""
     with pytest.raises(RuntimeError) as ex_info:
@@ -117,7 +117,7 @@ def test_an_error_is_raised_when_custom_logging_config_file_does_not_exist():
 
 @patch("vllm.logger.VLLM_CONFIGURE_LOGGING", 1)
 def test_an_error_is_raised_when_custom_logging_config_is_invalid_json():
-    """This test calls _configure_vllm_root_logger again to test custom logging
+    """This test calls _configure_vllm_root_logger again to test structure logging
     config behavior, however it fails before any change in behavior or
     configuration occurs."""
     with NamedTemporaryFile(encoding="utf-8", mode="w") as logging_config_file:
@@ -142,7 +142,7 @@ def test_an_error_is_raised_when_custom_logging_config_is_invalid_json():
 ))
 def test_an_error_is_raised_when_custom_logging_config_is_unexpected_json(
         unexpected_config: Any):
-    """This test calls _configure_vllm_root_logger again to test custom logging
+    """This test calls _configure_vllm_root_logger again to test structure logging
     config behavior, however it fails before any change in behavior or
     configuration occurs."""
     with NamedTemporaryFile(encoding="utf-8", mode="w") as logging_config_file:
@@ -158,7 +158,7 @@ def test_an_error_is_raised_when_custom_logging_config_is_unexpected_json(
 
 @patch("vllm.logger.VLLM_CONFIGURE_LOGGING", 1)
 def test_custom_logging_config_is_parsed_and_used_when_provided():
-    """This test calls _configure_vllm_root_logger again to test custom logging
+    """This test calls _configure_vllm_root_logger again to test structure logging
     config behavior, however mocks are used to ensure no changes in behavior or
     configuration occur."""
     valid_logging_config = {
@@ -182,7 +182,7 @@ def test_custom_logging_config_is_parsed_and_used_when_provided():
 
 @patch("vllm.logger.VLLM_CONFIGURE_LOGGING", 0)
 def test_custom_logging_config_causes_an_error_if_configure_logging_is_off():
-    """This test calls _configure_vllm_root_logger again to test custom logging
+    """This test calls _configure_vllm_root_logger again to test structure logging
     config behavior, however mocks are used to ensure no changes in behavior or
     configuration occur."""
     valid_logging_config = {

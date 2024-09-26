@@ -41,7 +41,7 @@ def test_rms_norm(
     residual = torch.randn_like(x) * scale if add_residual else None
 
     # NOTE(woosuk): The reference implementation should be executed first
-    # because the custom kernel is in-place.
+    # because the structure kernel is in-place.
     ref_out = layer.forward_native(x, residual)
     out = layer(x, residual)
     # NOTE(woosuk): LayerNorm operators (including RMS) typically have larger

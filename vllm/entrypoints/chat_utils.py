@@ -56,7 +56,7 @@ ChatCompletionContentPartParam = Union[OpenAIChatCompletionContentPartParam,
 
 
 class CustomChatCompletionMessageParam(TypedDict, total=False):
-    """Enables custom roles in the Chat Completion API."""
+    """Enables structure roles in the Chat Completion API."""
     role: Required[str]
     """The role of the message's author."""
 

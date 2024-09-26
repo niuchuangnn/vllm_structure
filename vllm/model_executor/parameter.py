@@ -5,6 +5,7 @@ from torch.nn import Parameter
 
 from vllm.distributed import get_tensor_model_parallel_rank
 from vllm.logger import init_logger
+import os
 
 __all__ = [
     "BasevLLMParameter", "PackedvLLMParameter", "PerTensorScaleParameter",
@@ -99,7 +100,11 @@ class _ColumnvLLMParameter(BasevLLMParameter):
 
         param_data = self.data
 
-        tp_rank = get_tensor_model_parallel_rank()
+        # tp_rank = get_tensor_model_parallel_rank()
+        if "LOCAL_RANK" in os.environ:
+            tp_rank = int(os.environ["LOCAL_RANK"])
+        else:
+            tp_rank = get_tensor_model_parallel_rank()
         param_data = param_data.narrow(self.output_dim, shard_offset,
                                        shard_size)
         loaded_weight = loaded_weight.narrow(self.output_dim,
@@ -122,7 +127,11 @@ class _ColumnvLLMParameter(BasevLLMParameter):
                 shard_offset=shard_offset, shard_size=shard_size)
 
         param_data = self.data
-        tp_rank = get_tensor_model_parallel_rank()
+        # tp_rank = get_tensor_model_parallel_rank()
+        if "LOCAL_RANK" in os.environ:
+            tp_rank = int(os.environ["LOCAL_RANK"])
+        else:
+            tp_rank = get_tensor_model_parallel_rank()
         shard_id = tp_rank if shard_id == "q" else tp_rank // num_heads
         param_data = param_data.narrow(self.output_dim, shard_offset,
                                        shard_size)
@@ -150,7 +159,11 @@ class RowvLLMParameter(BasevLLMParameter):
         return self._input_dim
 
     def load_row_parallel_weight(self, loaded_weight: torch.Tensor):
-        tp_rank = get_tensor_model_parallel_rank()
+        # tp_rank = get_tensor_model_parallel_rank()
+        if "LOCAL_RANK" in os.environ:
+            tp_rank = int(os.environ["LOCAL_RANK"])
+        else:
+            tp_rank = get_tensor_model_parallel_rank()
         shard_size = self.data.shape[self.input_dim]
         loaded_weight = loaded_weight.narrow(self.input_dim,
                                              tp_rank * shard_size, shard_size)

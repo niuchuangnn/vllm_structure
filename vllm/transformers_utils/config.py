@@ -66,7 +66,7 @@ def get_config(
         if (not trust_remote_code and
                 "requires you to execute the configuration file" in str(e)):
             err_msg = (
-                "Failed to load the model config. If the model is a custom "
+                "Failed to load the model config. If the model is a structure "
                 "model not yet available in the HuggingFace transformers "
                 "library, consider setting `trust_remote_code=True` in LLM "
                 "or using the `--trust-remote-code` flag in the CLI.")

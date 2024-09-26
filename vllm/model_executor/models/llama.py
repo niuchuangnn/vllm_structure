@@ -53,18 +53,19 @@ from vllm.utils import is_hip
 
 from .interfaces import SupportsLoRA
 from .utils import PPMissingLayer, is_pp_missing_parameter, make_layers
+import os
 
 
 class LlamaMLP(nn.Module):
 
     def __init__(
-        self,
-        hidden_size: int,
-        intermediate_size: int,
-        hidden_act: str,
-        quant_config: Optional[QuantizationConfig] = None,
-        bias: bool = False,
-        prefix: str = "",
+            self,
+            hidden_size: int,
+            intermediate_size: int,
+            hidden_act: str,
+            quant_config: Optional[QuantizationConfig] = None,
+            bias: bool = False,
+            prefix: str = "",
     ) -> None:
         super().__init__()
         self.gate_up_proj = MergedColumnParallelLinear(
@@ -93,22 +94,23 @@ class LlamaMLP(nn.Module):
 class LlamaAttention(nn.Module):
 
     def __init__(
-        self,
-        config: LlamaConfig,
-        hidden_size: int,
-        num_heads: int,
-        num_kv_heads: int,
-        rope_theta: float = 10000,
-        rope_scaling: Optional[Dict[str, Any]] = None,
-        max_position_embeddings: int = 8192,
-        quant_config: Optional[QuantizationConfig] = None,
-        bias: bool = False,
-        cache_config: Optional[CacheConfig] = None,
-        prefix: str = "",
+            self,
+            config: LlamaConfig,
+            hidden_size: int,
+            num_heads: int,
+            num_kv_heads: int,
+            rope_theta: float = 10000,
+            rope_scaling: Optional[Dict[str, Any]] = None,
+            max_position_embeddings: int = 8192,
+            quant_config: Optional[QuantizationConfig] = None,
+            bias: bool = False,
+            cache_config: Optional[CacheConfig] = None,
+            prefix: str = "",
     ) -> None:
         super().__init__()
         self.hidden_size = hidden_size
-        tp_size = get_tensor_model_parallel_world_size()
+        # tp_size = get_tensor_model_parallel_world_size()
+        tp_size = 8
         self.total_num_heads = num_heads
         assert self.total_num_heads % tp_size == 0
         self.num_heads = self.total_num_heads // tp_size
@@ -127,7 +129,7 @@ class LlamaAttention(nn.Module):
                                 self.hidden_size // self.total_num_heads)
         self.q_size = self.num_heads * self.head_dim
         self.kv_size = self.num_kv_heads * self.head_dim
-        self.scaling = self.head_dim**-0.5
+        self.scaling = self.head_dim ** -0.5
         self.rope_theta = rope_theta
         self.max_position_embeddings = max_position_embeddings
 
@@ -169,11 +171,11 @@ class LlamaAttention(nn.Module):
                               quant_config=quant_config)
 
     def forward(
-        self,
-        positions: torch.Tensor,
-        hidden_states: torch.Tensor,
-        kv_cache: torch.Tensor,
-        attn_metadata: AttentionMetadata,
+            self,
+            positions: torch.Tensor,
+            hidden_states: torch.Tensor,
+            kv_cache: torch.Tensor,
+            attn_metadata: AttentionMetadata,
     ) -> torch.Tensor:
         qkv, _ = self.qkv_proj(hidden_states)
         q, k, v = qkv.split([self.q_size, self.kv_size, self.kv_size], dim=-1)
@@ -186,11 +188,11 @@ class LlamaAttention(nn.Module):
 class LlamaDecoderLayer(nn.Module):
 
     def __init__(
-        self,
-        config: LlamaConfig,
-        cache_config: Optional[CacheConfig] = None,
-        quant_config: Optional[QuantizationConfig] = None,
-        prefix: str = "",
+            self,
+            config: LlamaConfig,
+            cache_config: Optional[CacheConfig] = None,
+            quant_config: Optional[QuantizationConfig] = None,
+            prefix: str = "",
     ) -> None:
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -234,12 +236,12 @@ class LlamaDecoderLayer(nn.Module):
                                                 eps=config.rms_norm_eps)
 
     def forward(
-        self,
-        positions: torch.Tensor,
-        hidden_states: torch.Tensor,
-        kv_cache: torch.Tensor,
-        attn_metadata: AttentionMetadata,
-        residual: Optional[torch.Tensor],
+            self,
+            positions: torch.Tensor,
+            hidden_states: torch.Tensor,
+            kv_cache: torch.Tensor,
+            attn_metadata: AttentionMetadata,
+            residual: Optional[torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # Self Attention
         if residual is None:
@@ -265,12 +267,12 @@ class LlamaDecoderLayer(nn.Module):
 class LlamaModel(nn.Module):
 
     def __init__(
-        self,
-        config: LlamaConfig,
-        cache_config: Optional[CacheConfig] = None,
-        quant_config: Optional[QuantizationConfig] = None,
-        lora_config: Optional[LoRAConfig] = None,
-        prefix: str = "",
+            self,
+            config: LlamaConfig,
+            cache_config: Optional[CacheConfig] = None,
+            quant_config: Optional[QuantizationConfig] = None,
+            lora_config: Optional[LoRAConfig] = None,
+            prefix: str = "",
     ) -> None:
         super().__init__()
         self.config = config
@@ -279,16 +281,23 @@ class LlamaModel(nn.Module):
                       (lora_config.max_loras or 1)) if lora_config else 0
         self.vocab_size = config.vocab_size + lora_vocab
         self.org_vocab_size = config.vocab_size
-        if get_pp_group().is_first_rank or (config.tie_word_embeddings
-                                            and get_pp_group().is_last_rank):
-            self.embed_tokens = VocabParallelEmbedding(
-                self.vocab_size,
-                config.hidden_size,
-                org_num_embeddings=config.vocab_size,
-                quant_config=quant_config,
-            )
-        else:
-            self.embed_tokens = PPMissingLayer()
+        # if get_pp_group().is_first_rank or (config.tie_word_embeddings
+        #                                     and get_pp_group().is_last_rank):
+        #     self.embed_tokens = VocabParallelEmbedding(
+        #         self.vocab_size,
+        #         config.hidden_size,
+        #         org_num_embeddings=config.vocab_size,
+        #         quant_config=quant_config,
+        #     )
+        # else:
+        #     self.embed_tokens = PPMissingLayer()
+        self.embed_tokens = VocabParallelEmbedding(
+            self.vocab_size,
+            config.hidden_size,
+            org_num_embeddings=config.vocab_size,
+            quant_config=quant_config,
+        )
+
         self.start_layer, self.end_layer, self.layers = make_layers(
             config.num_hidden_layers,
             lambda prefix: LlamaDecoderLayer(config=config,
@@ -296,33 +305,41 @@ class LlamaModel(nn.Module):
                                              quant_config=quant_config,
                                              prefix=prefix),
             prefix=f"{prefix}.layers")
-        if get_pp_group().is_last_rank:
-            self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        else:
-            self.norm = PPMissingLayer()
+
+        # if get_pp_group().is_last_rank:
+        #     self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        # else:
+        #     self.norm = PPMissingLayer()
+
+        self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
     def get_input_embeddings(self, input_ids: torch.Tensor) -> torch.Tensor:
         return self.embed_tokens(input_ids)
 
     def forward(
-        self,
-        input_ids: Optional[torch.Tensor],
-        positions: torch.Tensor,
-        kv_caches: List[torch.Tensor],
-        attn_metadata: AttentionMetadata,
-        intermediate_tensors: Optional[IntermediateTensors],
-        inputs_embeds: Optional[torch.Tensor] = None,
+            self,
+            input_ids: Optional[torch.Tensor],
+            positions: torch.Tensor,
+            kv_caches: List[torch.Tensor],
+            attn_metadata: AttentionMetadata,
+            intermediate_tensors: Optional[IntermediateTensors],
+            inputs_embeds: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
-        if get_pp_group().is_first_rank:
-            if inputs_embeds is not None:
-                hidden_states = inputs_embeds
-            else:
-                hidden_states = self.get_input_embeddings(input_ids)
-            residual = None
+        # if get_pp_group().is_first_rank:
+        #     if inputs_embeds is not None:
+        #         hidden_states = inputs_embeds
+        #     else:
+        #         hidden_states = self.get_input_embeddings(input_ids)
+        #     residual = None
+        # else:
+        #     assert intermediate_tensors is not None
+        #     hidden_states = intermediate_tensors["hidden_states"]
+        #     residual = intermediate_tensors["residual"]
+        if inputs_embeds is not None:
+            hidden_states = inputs_embeds
         else:
-            assert intermediate_tensors is not None
-            hidden_states = intermediate_tensors["hidden_states"]
-            residual = intermediate_tensors["residual"]
+            hidden_states = self.get_input_embeddings(input_ids)
+        residual = None
 
         for i in range(self.start_layer, self.end_layer):
             layer = self.layers[i]
@@ -334,11 +351,11 @@ class LlamaModel(nn.Module):
                 residual,
             )
 
-        if not get_pp_group().is_last_rank:
-            return IntermediateTensors({
-                "hidden_states": hidden_states,
-                "residual": residual
-            })
+        # if not get_pp_group().is_last_rank:
+        #     return IntermediateTensors({
+        #         "hidden_states": hidden_states,
+        #         "residual": residual
+        #     })
 
         hidden_states, _ = self.norm(hidden_states, residual)
         return hidden_states
@@ -377,11 +394,11 @@ class LlamaForCausalLM(nn.Module, SupportsLoRA):
     }
 
     def __init__(
-        self,
-        config: LlamaConfig,
-        cache_config: Optional[CacheConfig] = None,
-        quant_config: Optional[QuantizationConfig] = None,
-        lora_config: Optional[LoRAConfig] = None,
+            self,
+            config: LlamaConfig,
+            cache_config: Optional[CacheConfig] = None,
+            quant_config: Optional[QuantizationConfig] = None,
+            lora_config: Optional[LoRAConfig] = None,
     ) -> None:
         super().__init__()
 
@@ -393,58 +410,94 @@ class LlamaForCausalLM(nn.Module, SupportsLoRA):
                                 quant_config,
                                 lora_config=lora_config,
                                 prefix="model")
-        if get_pp_group().is_last_rank:
-            self.unpadded_vocab_size = config.vocab_size
-            if lora_config:
-                self.unpadded_vocab_size += lora_config.lora_extra_vocab_size
-            self.lm_head = ParallelLMHead(
-                self.unpadded_vocab_size,
-                config.hidden_size,
-                org_num_embeddings=config.vocab_size,
-                padding_size=DEFAULT_VOCAB_PADDING_SIZE
-                # We need bigger padding if using lora for kernel
-                # compatibility
-                if not lora_config else lora_config.lora_vocab_padding_size,
-                quant_config=quant_config,
-            )
-            if config.tie_word_embeddings:
-                self.lm_head.weight = self.model.embed_tokens.weight
+        # if get_pp_group().is_last_rank:
+        #     self.unpadded_vocab_size = config.vocab_size
+        #     if lora_config:
+        #         self.unpadded_vocab_size += lora_config.lora_extra_vocab_size
+        #     self.lm_head = ParallelLMHead(
+        #         self.unpadded_vocab_size,
+        #         config.hidden_size,
+        #         org_num_embeddings=config.vocab_size,
+        #         padding_size=DEFAULT_VOCAB_PADDING_SIZE
+        #         # We need bigger padding if using lora for kernel
+        #         # compatibility
+        #         if not lora_config else lora_config.lora_vocab_padding_size,
+        #         quant_config=quant_config,
+        #     )
+        #     if config.tie_word_embeddings:
+        #         self.lm_head.weight = self.model.embed_tokens.weight
+        #
+        #     logit_scale = getattr(config, "logit_scale", 1.0)
+        #     self.logits_processor = LogitsProcessor(self.unpadded_vocab_size,
+        #                                             config.vocab_size,
+        #                                             logit_scale)
+        #     self.sampler = Sampler()
+        # else:
+        #     self.lm_head = PPMissingLayer()
+        self.unpadded_vocab_size = config.vocab_size
+        if lora_config:
+            self.unpadded_vocab_size += lora_config.lora_extra_vocab_size
+        self.lm_head = ParallelLMHead(
+            self.unpadded_vocab_size,
+            config.hidden_size,
+            org_num_embeddings=config.vocab_size,
+            padding_size=DEFAULT_VOCAB_PADDING_SIZE
+            # We need bigger padding if using lora for kernel
+            # compatibility
+            if not lora_config else lora_config.lora_vocab_padding_size,
+            quant_config=quant_config,
+        )
+        if config.tie_word_embeddings:
+            self.lm_head.weight = self.model.embed_tokens.weight
 
-            logit_scale = getattr(config, "logit_scale", 1.0)
-            self.logits_processor = LogitsProcessor(self.unpadded_vocab_size,
-                                                    config.vocab_size,
-                                                    logit_scale)
-            self.sampler = Sampler()
-        else:
-            self.lm_head = PPMissingLayer()
+        logit_scale = getattr(config, "logit_scale", 1.0)
+        self.logits_processor = LogitsProcessor(self.unpadded_vocab_size,
+                                                config.vocab_size,
+                                                logit_scale)
+        self.sampler = Sampler()
 
     def forward(
-        self,
-        input_ids: torch.Tensor,
-        positions: torch.Tensor,
-        kv_caches: List[torch.Tensor],
-        attn_metadata: AttentionMetadata,
-        intermediate_tensors: Optional[IntermediateTensors] = None,
+            self,
+            input_ids: torch.Tensor,
+            positions: torch.Tensor,
+            kv_caches: List[torch.Tensor],
+            attn_metadata: AttentionMetadata,
+            intermediate_tensors: Optional[IntermediateTensors] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         model_output = self.model(input_ids, positions, kv_caches,
                                   attn_metadata, intermediate_tensors)
         return model_output
 
     def compute_logits(
-        self,
-        hidden_states: torch.Tensor,
-        sampling_metadata: SamplingMetadata,
+            self,
+            hidden_states: torch.Tensor,
+            sampling_metadata: SamplingMetadata,
     ) -> Optional[torch.Tensor]:
         logits = self.logits_processor(self.lm_head, hidden_states,
                                        sampling_metadata)
         return logits
 
     def sample(
-        self,
-        logits: torch.Tensor,
-        sampling_metadata: SamplingMetadata,
+            self,
+            logits: torch.Tensor,
+            sampling_metadata: SamplingMetadata,
+            template_tokens: Optional[List[int]] = None,
+            candidate_tokens_dict: Optional[list[dict]] = None,
+            candidate_idx_temp: Optional[list[list[list[int]]]] = None,
+            loc_template: Optional[list[int]] = None,
+            loc_in_current_candidate: Optional[list[int]] = None,
+            num_template_predicted: Optional[list[int]] = None,
+            update_template: Optional[list[bool]] = None,
     ) -> Optional[SamplerOutput]:
-        next_tokens = self.sampler(logits, sampling_metadata)
+        next_tokens = self.sampler(logits, sampling_metadata,
+                                   template_tokens=template_tokens,
+                                   candidate_tokens_dict=candidate_tokens_dict,
+                                   candidate_idx_temp=candidate_idx_temp,
+                                   loc_template=loc_template,
+                                   loc_in_current_candidate=loc_in_current_candidate,
+                                   num_template_predicted=num_template_predicted,
+                                   update_template=update_template
+                                   )
         return next_tokens
 
     def make_empty_intermediate_tensors(
@@ -452,13 +505,13 @@ class LlamaForCausalLM(nn.Module, SupportsLoRA):
             device: torch.device) -> IntermediateTensors:
         return IntermediateTensors({
             "hidden_states":
-            torch.zeros((batch_size, self.config.hidden_size),
-                        dtype=dtype,
-                        device=device),
+                torch.zeros((batch_size, self.config.hidden_size),
+                            dtype=dtype,
+                            device=device),
             "residual":
-            torch.zeros((batch_size, self.config.hidden_size),
-                        dtype=dtype,
-                        device=device),
+                torch.zeros((batch_size, self.config.hidden_size),
+                            dtype=dtype,
+                            device=device),
         })
 
     def load_weights(self, weights: Iterable[Tuple[str, torch.Tensor]]):

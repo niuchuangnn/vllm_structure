@@ -130,11 +130,27 @@ class SequenceData:
         self,
         prompt_token_ids: List[int],
         output_token_ids: Optional[List[int]] = None,
+        loc_template: Optional[int] = None,
+        loc_in_current_candidate: Optional[int] = None,
+        template_tokens: Optional[List[int]] = None,
+        candidate_tokens_dict: Optional[dict] = None,
+        candidate_idx_temp: Optional[List[List[int]]] = None,
+        num_candidates_predicted: Optional[int] = None,
+        update_template: Optional[bool] = False,
+        template: Optional[dict] = None,
     ) -> None:
         self._prompt_token_ids = array('l', prompt_token_ids)
         self._prompt_token_ids_tuple: Tuple[int, ...] = tuple(prompt_token_ids)
         self._output_token_ids = array(
             'l', output_token_ids if output_token_ids is not None else [])
+        self.loc_template = loc_template
+        self.loc_in_current_candidate = loc_in_current_candidate
+        self.template_tokens = template_tokens
+        self.candidate_tokens_dict = candidate_tokens_dict
+        self.candidate_idx_temp = candidate_idx_temp
+        self.num_candidates_predicted = num_candidates_predicted
+        self.update_template = update_template
+        self.template = template
 
         self.cumulative_logprob = 0.0
         # The number of tokens that are computed (that run against the model).
@@ -214,6 +230,33 @@ class SequenceData:
         # If all tokens are computed, it means it is in decoding phase.
         if self.get_num_uncomputed_tokens() == 0:
             self._stage = SequenceStage.DECODE
+
+    def set_loc_template(self, loc_template: int) -> None:
+        self.loc_template = loc_template
+
+    def set_loc_in_current_candidate(self, loc_in_current_candidate: int) -> None:
+        self.loc_in_current_candidate = loc_in_current_candidate
+
+    def set_num_candidates_predicted(self, num_candidates_predicted: int) -> None:
+        self.num_candidates_predicted = num_candidates_predicted
+
+    def set_update_template(self, update_template: bool) -> None:
+        self.update_template = update_template
+
+    def set_template_tokens(self, template_tokens: List[int]) -> None:
+        self.template_tokens = template_tokens
+
+    def set_candidate_tokens_dict(self, candidate_tokens_dict: dict) -> None:
+        self.candidate_tokens_dict = candidate_tokens_dict
+
+    def set_candidate_idx_temp(self, candidate_idx_temp: int) -> None:
+        self.candidate_idx_temp = candidate_idx_temp
+
+    def set_candidate_idx_temp(self, candidate_idx_temp: List[List[int]]) -> None:
+        self.candidate_idx_temp = candidate_idx_temp
+
+    def set_template(self, template: dict) -> None:
+        self.template = template
 
     def reset_state_for_recompute(self) -> None:
         """Reset the number of computed tokens from this sequence. It is
@@ -325,7 +368,33 @@ class Sequence:
                              f"invalid input {inputs}; did you forget the "
                              "encoder input prompt fields?")
 
-        self.data = SequenceData(self.prompt_token_ids)
+        if 'loc_template' in self.inputs:
+            loc_template = self.inputs['loc_template']
+            loc_in_current_candidate = self.inputs['loc_in_current_candidate']
+            template_tokens = self.inputs['template_tokens']
+            candidate_tokens_dict = self.inputs['candidate_tokens_dict']
+            candidate_idx_temp = self.inputs['candidate_idx_temp']
+            num_candidates_predicted = self.inputs['num_candidates_predicted']
+            update_template = self.inputs['update_template']
+            template = self.inputs['template']
+        else:
+            loc_template = None
+            loc_in_current_candidate = None
+            template_tokens = None
+            candidate_tokens_dict = None
+            candidate_idx_temp = None
+            num_candidates_predicted = None
+            update_template = None
+            template = None
+        self.data = SequenceData(self.prompt_token_ids,
+                                 loc_template=loc_template,
+                                 loc_in_current_candidate=loc_in_current_candidate,
+                                 template_tokens=template_tokens,
+                                 candidate_tokens_dict=candidate_tokens_dict,
+                                 candidate_idx_temp=candidate_idx_temp,
+                                 num_candidates_predicted=num_candidates_predicted,
+                                 update_template=update_template,
+                                 template=template,)
         self.output_logprobs: SampleLogprobs = []
         self.output_text = ""
 
@@ -695,6 +764,46 @@ class SequenceGroup:
             if not seq.is_finished():
                 seq.data.update_num_computed_tokens(num_new_computed_tokens)
 
+    def set_loc_template(self, loc_template: int):
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_loc_template(loc_template)
+
+    def set_loc_in_current_candidate(self, loc_in_current_candidate: int):
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_loc_in_current_candidate(loc_in_current_candidate)
+
+    def set_num_candidates_predicted(self, num_candidates_predicted: int):
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_num_candidates_predicted(num_candidates_predicted)
+
+    def set_update_template(self, update_template: bool):
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_update_template(update_template)
+
+    def set_template_tokens(self, template_tokens: List[int]):
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_template_tokens(template_tokens)
+
+    def set_candidate_tokens_dict(self, candidates_tokens_dict: dict):
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_candidate_tokens_dict(candidates_tokens_dict)
+
+    def set_candidate_idx_temp(self, candidate_idx_temp: List[List[int]]) -> None:
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_candidate_idx_temp(candidate_idx_temp)
+
+    def set_template(self, template: dict):
+        for seq in self.seqs:
+            if not seq.is_finished():
+                seq.data.set_template(template)
+
     def get_num_uncomputed_tokens(self) -> int:
         num_uncomputed_tokens = 0
         for seq in self.seqs:
@@ -877,10 +986,22 @@ class SequenceOutput:
         parent_seq_id: int,
         output_token: int,
         logprobs: Dict[int, Logprob],
+        loc_template: Optional[int] = None,
+        loc_in_current_candidate: Optional[int] = None,
+        num_candidates_predicted: Optional[int] = None,
+        update_template: Optional[bool] = None,
+        # candidate_tokens_dict: Optional[dict] = None,
+        candidate_idx_temp: Optional[List[List[int]]] = None,
     ) -> None:
         self.parent_seq_id = parent_seq_id
         self.output_token = output_token
         self.logprobs = logprobs
+        self.loc_template = loc_template
+        self.loc_in_current_candidate = loc_in_current_candidate
+        self.num_candidates_predicted = num_candidates_predicted
+        self.update_template = update_template
+        # self.candidate_tokens_dict = candidate_tokens_dict
+        self.candidate_idx_temp = candidate_idx_temp
 
     def __repr__(self) -> str:
         return (f"SequenceOutput(parent_seq_id={self.parent_seq_id}, "
@@ -1011,6 +1132,9 @@ class SamplerOutput:
     # Time taken in the model execute function. This will include model forward,
     # block/sync across workers, cpu-gpu sync time and sampling time.
     model_execute_time: Optional[float] = None
+
+    # Add
+    # template_outputs: Optional[List[dict]] = None
 
     def __getitem__(self, idx: int):
         return self.outputs[idx]

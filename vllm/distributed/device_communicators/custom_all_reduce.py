@@ -56,7 +56,7 @@ class CustomAllreduce:
         self.disabled = True
 
         if not custom_ar:
-            # disable because of missing custom allreduce library
+            # disable because of missing structure allreduce library
             # e.g. in a non-cuda environment
             return
 
@@ -66,7 +66,7 @@ class CustomAllreduce:
             "CustomAllreduce should be attached to a non-NCCL group.")
 
         if not all(in_the_same_node_as(group, source_rank=0)):
-            # No need to initialize custom allreduce for multi-node case.
+            # No need to initialize structure allreduce for multi-node case.
             logger.warning(
                 "Custom allreduce is disabled because this process group"
                 " spans across nodes.")
@@ -75,7 +75,7 @@ class CustomAllreduce:
         rank = dist.get_rank(group=self.group)
         world_size = dist.get_world_size(group=self.group)
         if world_size == 1:
-            # No need to initialize custom allreduce for single GPU case.
+            # No need to initialize structure allreduce for single GPU case.
             return
 
         if world_size not in CustomAllreduce._SUPPORTED_WORLD_SIZES:
@@ -112,7 +112,7 @@ class CustomAllreduce:
         physical_device_ids = [t.item() for t in gather_list]
 
         # test nvlink first, this will filter out most of the cases
-        # where custom allreduce is not supported
+        # where structure allreduce is not supported
         # this checks hardware and driver support for NVLink
         assert current_platform.is_cuda()
         from vllm.platforms.cuda import CudaPlatform
@@ -243,7 +243,7 @@ class CustomAllreduce:
         return out
 
     def custom_all_reduce(self, input: torch.Tensor) -> Optional[torch.Tensor]:
-        # when custom allreduce is disabled, this will be None
+        # when structure allreduce is disabled, this will be None
         if self.disabled:
             return None
         if self._IS_CAPTURING:
@@ -253,13 +253,13 @@ class CustomAllreduce:
             else:
                 if self.should_custom_ar(input):
                     # if warm up, mimic the allocation pattern
-                    # since custom allreduce is out-of-place
+                    # since structure allreduce is out-of-place
                     return torch.empty_like(input)
         else:
             # note: outside of cuda graph context,
-            # custom allreduce incurs a cost of cudaMemcpy, which should
+            # structure allreduce incurs a cost of cudaMemcpy, which should
             # be small(<=1% of overall latency) compared to the performance
-            # gains of using custom kernels
+            # gains of using structure kernels
             if self.should_custom_ar(input):
                 return self.all_reduce_unreg(input)
 

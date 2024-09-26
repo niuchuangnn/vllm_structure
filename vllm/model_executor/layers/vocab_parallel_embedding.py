@@ -11,6 +11,7 @@ from vllm.distributed import (divide, get_tensor_model_parallel_rank,
 from vllm.model_executor.layers.quantization.base_config import (
     QuantizationConfig, QuantizeMethodBase, method_has_implemented_embedding)
 from vllm.model_executor.utils import set_weight_attrs
+import os
 
 DEFAULT_VOCAB_PADDING_SIZE = 64
 
@@ -202,8 +203,13 @@ class VocabParallelEmbedding(torch.nn.Module):
         super().__init__()
 
         # Keep the input dimensions.
-        tp_rank = get_tensor_model_parallel_rank()
-        self.tp_size = get_tensor_model_parallel_world_size()
+        # tp_rank = get_tensor_model_parallel_rank()
+        if "LOCAL_RANK" in os.environ:
+            tp_rank = int(os.environ["LOCAL_RANK"])
+        else:
+            tp_rank = get_tensor_model_parallel_rank()
+        # self.tp_size = get_tensor_model_parallel_world_size()
+        self.tp_size = 8
         self.num_embeddings = num_embeddings
         self.padding_size = padding_size
         self.org_vocab_size = org_num_embeddings or num_embeddings

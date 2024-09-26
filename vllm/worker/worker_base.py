@@ -172,7 +172,7 @@ class LocalOrDistributedWorkerBase(WorkerBase):
     definition to perform metadata transfer between workers when in distributed
     mode. Subclasses of this interface should use model runners that inherit
     from ModelRunnerBase, and should only need to implement worker-local logic.
-    If custom control plane logic is needed to transfer metadata, or if the
+    If structure control plane logic is needed to transfer metadata, or if the
     model runner cannot inherit from ModelRunnerBase, use WorkerBase instead.
     """
     is_driver_worker: bool
@@ -288,6 +288,12 @@ class LocalOrDistributedWorkerBase(WorkerBase):
         inputs = self.prepare_input(execute_model_req)
         if inputs is None:
             return None
+
+        # # add
+        # if execute_model_req is not None:
+        #     seq_data = execute_model_req.seq_group_metadata_list[0].seq_data[0]
+        # else:
+        #     seq_data = None
 
         model_input, worker_input = inputs
         num_steps = worker_input.num_steps

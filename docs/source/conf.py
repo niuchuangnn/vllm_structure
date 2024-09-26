@@ -29,7 +29,7 @@ author = 'the vLLM Team'
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
+# extensions coming with Sphinx (named 'sphinx.ext.*') or your structure
 # ones.
 extensions = [
     "sphinx.ext.napoleon",
@@ -69,7 +69,7 @@ html_theme_options = {
     'use_edit_page_button': True,
 }
 html_static_path = ["_static"]
-html_js_files = ["custom.js"]
+html_js_files = ["structure.js"]
 
 # see https://docs.readthedocs.io/en/stable/reference/environment-variables.html # noqa
 READTHEDOCS_VERSION_TYPE = os.environ.get('READTHEDOCS_VERSION_TYPE')
@@ -82,7 +82,7 @@ if READTHEDOCS_VERSION_TYPE == "tag":
     if os.path.exists(header_file):
         os.remove(header_file)
 
-# Add any paths that contain custom static files (such as style sheets) here,
+# Add any paths that contain structure static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']

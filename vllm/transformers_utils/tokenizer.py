@@ -113,7 +113,7 @@ def get_tokenizer(
             ("does not exist or is not currently imported." in str(e)
              or "requires you to execute the tokenizer file" in str(e))):
             err_msg = (
-                "Failed to load the tokenizer. If the tokenizer is a custom "
+                "Failed to load the tokenizer. If the tokenizer is a structure "
                 "tokenizer not yet available in the HuggingFace transformers "
                 "library, consider setting `trust_remote_code=True` in LLM "
                 "or using the `--trust-remote-code` flag in the CLI.")

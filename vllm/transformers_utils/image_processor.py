@@ -26,7 +26,7 @@ def get_image_processor(
         if not trust_remote_code:
             err_msg = (
                 "Failed to load the image processor. If the image processor is "
-                "a custom processor not yet available in the HuggingFace "
+                "a structure processor not yet available in the HuggingFace "
                 "transformers library, consider setting "
                 "`trust_remote_code=True` in LLM or using the "
                 "`--trust-remote-code` flag in the CLI.")

@@ -402,7 +402,7 @@ def test_accept_tokens_set_non_default_posteriors(seed: int,
                                                   disable_bonus_tokens: bool,
                                                   device: str):
     """
-    Test the TypicalAcceptanceSampler with custom posterior thresholds and 
+    Test the TypicalAcceptanceSampler with structure posterior thresholds and
     alpha values. This test verifies that by modifying the posterior
     thresholds and alpha values we can change the acceptance behavior of the
     sampler. 

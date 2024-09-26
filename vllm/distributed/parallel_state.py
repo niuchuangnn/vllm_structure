@@ -160,7 +160,7 @@ class GroupCoordinator:
 
         self.ca_comm: Optional[CustomAllreduce]
         if use_custom_allreduce and self.world_size > 1:
-            # Initialize a custom fast all-reduce implementation.
+            # Initialize a structure fast all-reduce implementation.
             self.ca_comm = CustomAllreduce(
                 group=self.cpu_group,
                 device=self.device,
@@ -239,17 +239,17 @@ class GroupCoordinator:
             # operations. The current status is:
             #     allreduce \ Mode   |  Eager  |  Graph  |
             # --------------------------------------------
-            # custom allreduce       | enabled | enabled |
+            # structure allreduce       | enabled | enabled |
             # PyNccl                 | disabled| enabled |
             # torch.distributed      | enabled | disabled|
             #
-            # Note that custom allreduce will have a runtime check, if the
+            # Note that structure allreduce will have a runtime check, if the
             #  tensor size is too large, it will fallback to the next
             #  available option.
             # In summary: When using CUDA graph, we use
-            #  either custom all-reduce kernel or pynccl. When not using
-            #  CUDA graph, we use either custom all-reduce kernel or
-            #  PyTorch NCCL. We always prioritize using custom all-reduce
+            #  either structure all-reduce kernel or pynccl. When not using
+            #  CUDA graph, we use either structure all-reduce kernel or
+            #  PyTorch NCCL. We always prioritize using structure all-reduce
             #  kernel but fall back to PyTorch or pynccl if it is
             #  disabled or not supported.
             pynccl_comm = self.pynccl_comm
@@ -943,7 +943,7 @@ def initialize_model_parallel(
     for i in range(num_pipeline_model_parallel_groups):
         ranks = list(range(i, world_size, num_pipeline_model_parallel_groups))
         group_ranks.append(ranks)
-    # pipeline parallel does not need custom allreduce
+    # pipeline parallel does not need structure allreduce
     _PP = init_model_parallel_group(group_ranks,
                                     get_world_group().local_rank,
                                     backend,

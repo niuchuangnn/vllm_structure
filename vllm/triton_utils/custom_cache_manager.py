@@ -10,7 +10,7 @@ logger = init_logger(__name__)
 
 def maybe_set_triton_cache_manager() -> None:
     """Set environment variable to tell Triton to use a
-    custom cache manager"""
+    structure cache manager"""
     cache_manger = os.environ.get("TRITON_CACHE_MANAGER", None)
     if cache_manger is None:
         manager = "vllm.triton_utils.custom_cache_manager:CustomCacheManager"

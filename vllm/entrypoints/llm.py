@@ -1,3 +1,4 @@
+import copy
 from contextlib import contextmanager
 from typing import ClassVar, List, Optional, Sequence, Union, cast, overload
 
@@ -128,6 +129,7 @@ class LLM:
         max_context_len_to_capture: Optional[int] = None,
         max_seq_len_to_capture: int = 8192,
         disable_custom_all_reduce: bool = False,
+        additional_special_tokens: List[str] = None,
         **kwargs,
     ) -> None:
         '''
@@ -169,10 +171,11 @@ class LLM:
             max_context_len_to_capture=max_context_len_to_capture,
             max_seq_len_to_capture=max_seq_len_to_capture,
             disable_custom_all_reduce=disable_custom_all_reduce,
+            # max_num_seqs=2,
             **kwargs,
         )
         self.llm_engine = LLMEngine.from_engine_args(
-            engine_args, usage_context=UsageContext.LLM_CLASS)
+            engine_args, usage_context=UsageContext.LLM_CLASS, additional_special_tokens=additional_special_tokens)
         self.request_counter = Counter()
 
     def get_tokenizer(
@@ -283,7 +286,9 @@ class LLM:
         lora_request: Optional[Union[List[LoRARequest], LoRARequest]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         guided_options_request: Optional[Union[LLMGuidedOptions,
-                                               GuidedDecodingRequest]] = None
+                                               GuidedDecodingRequest]] = None,
+        templates: Optional[dict] = None,
+        candidate_tokens_dict: Optional[dict] = None,
     ) -> List[RequestOutput]:
         """Generates the completions for the input prompts.
 
@@ -342,7 +347,9 @@ class LLM:
             params=sampling_params,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
-            guided_options=guided_options_request)
+            guided_options=guided_options_request,
+            templates=templates,
+            candidate_tokens_dict=candidate_tokens_dict)
 
         outputs = self._run_engine(use_tqdm=use_tqdm)
         return LLMEngine.validate_outputs(outputs, RequestOutput)
@@ -597,6 +604,8 @@ class LLM:
         lora_request: Optional[Union[Sequence[LoRARequest], LoRARequest]],
         prompt_adapter_request: Optional[PromptAdapterRequest],
         guided_options: Optional[GuidedDecodingRequest] = None,
+        templates: Optional[dict] = None,
+        candidate_tokens_dict: Optional[dict] = None,
     ) -> None:
         if isinstance(inputs, (str, dict)):
             # Convert a single prompt to a list.
@@ -623,12 +632,19 @@ class LLM:
 
         # Add requests to the engine.
         for i, request_inputs in enumerate(inputs):
+            print(i, len(inputs))
+            if templates is not None:
+                request_template = templates[i]
+            else:
+                request_template = None
             self._add_request(
                 request_inputs,
                 params[i] if isinstance(params, Sequence) else params,
                 lora_request=lora_request[i] if isinstance(
                     lora_request, Sequence) else lora_request,
                 prompt_adapter_request=prompt_adapter_request,
+                template=request_template,
+                candidate_tokens_dict=candidate_tokens_dict,
             )
 
     def _add_request(
@@ -637,6 +653,8 @@ class LLM:
         params: Union[SamplingParams, PoolingParams],
         lora_request: Optional[Union[List[LoRARequest], LoRARequest]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        template: Optional[dict] = None,
+        candidate_tokens_dict: Optional[dict] = None,
     ) -> None:
         request_id = str(next(self.request_counter))
         self.llm_engine.add_request(
@@ -645,6 +663,8 @@ class LLM:
             params,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
+            template=template,
+            candidate_tokens_dict=candidate_tokens_dict,
         )
 
     def _add_guided_processor(

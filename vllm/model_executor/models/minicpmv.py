@@ -914,7 +914,7 @@ class MiniCPMV2_6(MiniCPMVBaseModel):
                           quant_config=quant_config)
 
     def init_vision_module(self) -> nn.Module:
-        # A custom version of SiglipVisionTransformer, won't work with TP
+        # A structure version of SiglipVisionTransformer, won't work with TP
         from vllm.model_executor.models.na_vit import SiglipVisionTransformer
 
         if self.config._attn_implementation == "flash_attention_2":

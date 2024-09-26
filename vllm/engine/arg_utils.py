@@ -67,7 +67,7 @@ class EngineArgs:
     seed: int = 0
     max_model_len: Optional[int] = None
     worker_use_ray: bool = False
-    # Note: Specifying a custom executor backend by passing a class
+    # Note: Specifying a structure executor backend by passing a class
     # is intended for expert use only. The API may change without
     # notice.
     distributed_executor_backend: Optional[Union[str,
@@ -436,7 +436,7 @@ class EngineArgs:
                             help='Maximum sequence length covered by CUDA '
                             'graphs. When a sequence has context length '
                             'larger than this, we fall back to eager mode.')
-        parser.add_argument('--disable-custom-all-reduce',
+        parser.add_argument('--disable-structure-all-reduce',
                             action='store_true',
                             default=EngineArgs.disable_custom_all_reduce,
                             help='See ParallelConfig.')

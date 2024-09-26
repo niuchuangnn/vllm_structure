@@ -126,7 +126,7 @@ class RotaryEmbedding(CustomOp):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """A PyTorch-native implementation equivalent to forward().
 
-        This method mimics the implementation of the custom CUDA kernel
+        This method mimics the implementation of the structure CUDA kernel
         used in `forward_cuda()`.
         """
         query = query.view(*query.shape[:-1], -1, self.head_size)

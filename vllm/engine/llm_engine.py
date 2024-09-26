@@ -21,7 +21,7 @@ from vllm.engine.metrics import (LoggingStatLogger, PrometheusStatLogger,
 from vllm.engine.output_processor.interfaces import (
     SequenceGroupOutputProcessor)
 from vllm.engine.output_processor.stop_checker import StopChecker
-from vllm.engine.output_processor.util import create_output_by_sequence_group
+from vllm.engine.output_processor.util import create_output_by_sequence_group, create_template_output_by_sequence_group
 from vllm.executor.executor_base import ExecutorBase
 from vllm.executor.ray_utils import initialize_ray_cluster
 from vllm.inputs import (INPUT_REGISTRY, EncoderDecoderLLMInputs,
@@ -50,6 +50,7 @@ from vllm.usage.usage_lib import (UsageContext, is_usage_stats_enabled,
                                   usage_message)
 from vllm.utils import Counter
 from vllm.version import __version__ as VLLM_VERSION
+import json
 
 logger = init_logger(__name__)
 _LOCAL_LOGGING_INTERVAL_SEC = 5
@@ -179,6 +180,7 @@ class LLMEngine:
         usage_context: UsageContext = UsageContext.ENGINE_CONTEXT,
         stat_loggers: Optional[Dict[str, StatLoggerBase]] = None,
         input_registry: InputRegistry = INPUT_REGISTRY,
+        additional_special_tokens: List[str] = None,
     ) -> None:
         logger.info(
             "Initializing an LLM engine (v%s) with config: "
@@ -242,6 +244,7 @@ class LLMEngine:
         self.observability_config = observability_config or ObservabilityConfig(
         )
         self.log_stats = log_stats
+        self.additional_special_tokens = additional_special_tokens
 
         if not self.model_config.skip_tokenizer_init:
             self.tokenizer = self._init_tokenizer()
@@ -457,6 +460,7 @@ class LLMEngine:
         engine_args: EngineArgs,
         usage_context: UsageContext = UsageContext.ENGINE_CONTEXT,
         stat_loggers: Optional[Dict[str, StatLoggerBase]] = None,
+        additional_special_tokens: Optional[List[str]] = None,
     ) -> "LLMEngine":
         """Creates an LLM engine from the engine arguments."""
         # Create the engine configs.
@@ -469,6 +473,7 @@ class LLMEngine:
             log_stats=not engine_args.disable_log_stats,
             usage_context=usage_context,
             stat_loggers=stat_loggers,
+            additional_special_tokens=additional_special_tokens,
         )
 
         return engine
@@ -506,7 +511,8 @@ class LLMEngine:
             model_config=self.model_config,
             scheduler_config=self.scheduler_config,
             parallel_config=self.parallel_config,
-            enable_lora=bool(self.lora_config))
+            enable_lora=bool(self.lora_config),
+            additional_special_tokens=self.additional_special_tokens)
 
     def _verify_args(self) -> None:
         self.model_config.verify_with_parallel_config(self.parallel_config)
@@ -694,6 +700,78 @@ class LLMEngine:
         return tokenizer.encode(request_id=request_id,
                                 prompt=prompt,
                                 lora_request=lora_request)
+
+    def encode_template_tokens(self, template_dict: dict, request_id: str):
+        template_dict_txt = json.dumps(template_dict, indent=4)
+        # template_dict_txt = template_dict_txt.replace("\"<", "<")
+        # template_dict_txt = template_dict_txt.replace(">\"", ">")
+        template_tokens = self._tokenize_prompt(template_dict_txt, request_id, None)
+        return template_tokens
+
+    # def encode_template(self, template: dict, request_id: str):
+    #     candidates = []
+    #     empty_dict = {}
+    #     for k, v in template.items():
+    #         if not isinstance(v, list):
+    #             assert v == "string"
+    #             empty_dict[k] = v
+    #             candidates.append(v)
+    #         elif isinstance(v, list):
+    #             if not isinstance(v[0], dict):
+    #                 if "string" in v:
+    #                     empty_dict[k] = "string"
+    #                 else:
+    #                     empty_dict[k] = None
+    #                 candidates.append(v)
+    #             else:
+    #                 empty_dict[k] = []
+    #                 for vv in v:
+    #                     nod_dict = {}
+    #                     for k1, v1 in vv.items():
+    #                         if "string" in v1:
+    #                             nod_dict[k1] = "string"
+    #                         else:
+    #                             nod_dict[k1] = None
+    #                         candidates.append(v1)
+    #                     empty_dict[k].append(nod_dict)
+    #         else:
+    #             raise TypeError
+    #     empty_dict_txt = json.dumps(empty_dict, indent=4)
+    #
+    #     tokens = self._tokenize_prompt(empty_dict_txt, request_id, None)
+    #
+    #     replace = -1
+    #     candicate_tokens_dict = {}
+    #     for i in range(len(tokens)):
+    #         t = tokens[i]
+    #         if t == 854 or t == 928:  # 854 is null and 928 is "string"
+    #             tokens[i] = replace
+    #
+    #             can = candidates[-replace-1]
+    #             can_tokens = []
+    #             if isinstance(can, list):
+    #                 for c in can:
+    #                     if c in ["no comma", "string"]:
+    #                         continue
+    #                     if "string" in can and "no comma" not in can:
+    #                         can_txt = "\": \"{}\",\n".format(c)
+    #                     elif "string" in can and "no comma" in can:
+    #                         can_txt = "\": \"{}\"\n".format(c)
+    #                     else:
+    #                         can_txt = "\": {},\n".format(c)
+    #                     can_txt_tokens = self._tokenize_prompt(can_txt, request_id, None)
+    #                     can_tokens = can_tokens + can_txt_tokens[1:-1]
+    #
+    #                 can_tokens = list(set(can_tokens))
+    #                 # if 220 in can_tokens:
+    #                 #     can_tokens.pop(can_tokens.index(220))
+    #                 can_tokens = can_tokens + [tokens[i+1]]
+    #
+    #             candicate_tokens_dict[replace] = can_tokens
+    #             replace = replace - 1
+    #
+    #     return tokens, candicate_tokens_dict
+
 
     def _extract_prompt_components(
         self,
@@ -965,6 +1043,9 @@ class LLMEngine:
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        template: Optional[str] = None,
+        candidate_tokens_dict: Optional[dict] = None,
+        candidate_idx_temp: Optional[List[List[int]]] = None,
     ) -> None:
         """Add a request to the engine's request pool.
 
@@ -1020,6 +1101,17 @@ class LLMEngine:
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
         )
+
+        if template is not None:
+            template_tokens = self.encode_template_tokens(template, request_id)
+            processed_inputs["loc_template"] = 0
+            processed_inputs["loc_in_current_candidate"] = 0
+            processed_inputs["template_tokens"] = template_tokens
+            processed_inputs["candidate_tokens_dict"] = candidate_tokens_dict
+            processed_inputs["candidate_idx_temp"] = candidate_idx_temp
+            processed_inputs["num_candidates_predicted"] = 0
+            processed_inputs["update_template"] = False
+            processed_inputs["template"] = template
 
         self._add_processed_request(
             request_id=request_id,
@@ -1183,9 +1275,11 @@ class LLMEngine:
         output_by_sequence_group = create_output_by_sequence_group(
             output, num_seq_groups=len(scheduled_seq_groups))
 
+        # template_output_by_sequence_group = create_template_output_by_sequence_group(output, num_seq_groups=len(scheduled_seq_groups))
+
         # Update the scheduled sequence groups with the model outputs.
         for scheduled_seq_group, outputs, seq_group_meta in zip(
-                scheduled_seq_groups, output_by_sequence_group,
+                scheduled_seq_groups, output_by_sequence_group, #template_output_by_sequence_group,
                 seq_group_metadata_list):
             seq_group = scheduled_seq_group.seq_group
             seq_group.update_num_computed_tokens(
@@ -1213,6 +1307,34 @@ class LLMEngine:
             self.output_processor.process_prompt_logprob(seq_group, outputs)
             if seq_group_meta.do_sample:
                 self.output_processor.process_outputs(seq_group, outputs)
+
+            assert len(outputs) == 1
+            # template_output = template_outputs[0]
+            seq_group.set_loc_template(outputs[0].samples[0].loc_template)
+            seq_group.set_loc_in_current_candidate(outputs[0].samples[0].loc_in_current_candidate)
+            seq_group.set_num_candidates_predicted(outputs[0].samples[0].num_candidates_predicted)
+            # seq_group.set_candidate_tokens_dict(outputs[0].samples[0].candidate_tokens_dict)
+            seq_group.set_candidate_idx_temp(outputs[0].samples[0].candidate_idx_temp)
+            if outputs[0].samples[0].update_template:
+                template = seq_group.seqs[0].inputs['template']
+                # candidate_tokens_dict = seq_group.seqs[0].inputs['candidate_tokens_dict']
+                seq = seq_group.get_seqs()[0]
+                # tokenizer = self.detokenizer.get_tokenizer_for_seq(seq)
+                # current_token_id = outputs[0].samples[0].output_token
+                # current_token = tokenizer.convert_ids_to_tokens([current_token_id], skip_special_tokens=False)
+                # current_token_text = tokenizer.convert_tokens_to_string(current_token)
+                # num_nodules = int(seq.tokens[-2])
+                num_nodules = int(seq.output_text.split(':')[1].split(',')[0].split()[0].replace('"', ''))
+                if num_nodules == 0:
+                    del template['nodules']
+                    # assert outputs[0].samples[0].output_token == 761
+                else:
+                    assert num_nodules > 0
+                    template['nodules'] = template['nodules'] * num_nodules
+
+                template_tokens = self.encode_template_tokens(template, '0')
+                seq_group.set_template_tokens(template_tokens)
+                # seq_group.set_candidate_tokens_dict(candidate_tokens_dict)
 
         # Free the finished sequence groups.
         for scheduler in self.scheduler:
