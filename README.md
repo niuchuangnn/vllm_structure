@@ -21,3 +21,15 @@ python structure_inference.py
 
 
 ## Citation
+
+```
+@misc{niu2024sr,
+      title={Cross-Institutional Structured Radiology Reporting for Lung Cancer Screening Using a Dynamic Template-Constrained Large Language Model}, 
+      author={Chuang Niu and Parisa Kaviani and Qing Lyu and Mannudeep K. Kalra and Christopher T. Whitlow and Ge Wang},
+      year={2024},
+      eprint={2409.18319},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2409.18319}, 
+}
+```
